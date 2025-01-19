@@ -1,3 +1,4 @@
+// src/services/database.ts
 import mysql from 'mysql2/promise';
 import { Story } from '../models/story';
 import { Logger } from '../utils/logger';
@@ -15,6 +16,10 @@ export class DatabaseService {
             connectionLimit: 10,
             queueLimit: 0
         });
+        Logger.info('Database service initialized', { 
+            host: process.env.MYSQL_HOST,
+            database: process.env.MYSQL_DATABASE 
+        });
     }
 
     async saveStory(story: Story): Promise<void> {
@@ -28,6 +33,7 @@ export class DatabaseService {
         `;
 
         try {
+            Logger.debug(`Attempting to save story ${story.id}`);
             await this.pool.execute(query, [
                 story.id,
                 story.title,
@@ -37,6 +43,7 @@ export class DatabaseService {
                 story.published_at,
                 story.type
             ]);
+            Logger.debug(`Successfully saved story ${story.id}`);
         } catch (error) {
             Logger.error(`Failed to save story ${story.id}:`, error as Error);
             throw error;
@@ -44,8 +51,25 @@ export class DatabaseService {
     }
 
     async saveStories(stories: Story[]): Promise<void> {
-        for (const story of stories) {
-            await this.saveStory(story);
+        Logger.info(`Attempting to save ${stories.length} stories`);
+        
+        // Use transaction for bulk insert
+        const connection = await this.pool.getConnection();
+        try {
+            await connection.beginTransaction();
+            
+            for (const story of stories) {
+                await this.saveStory(story);
+            }
+            
+            await connection.commit();
+            Logger.info(`Successfully saved ${stories.length} stories`);
+        } catch (error) {
+            await connection.rollback();
+            Logger.error('Failed to save stories batch:', error as Error);
+            throw error;
+        } finally {
+            connection.release();
         }
     }
 
