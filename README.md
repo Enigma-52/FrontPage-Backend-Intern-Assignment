@@ -31,3 +31,71 @@ A microservices-based system that provides real-time updates for Hacker News sto
 -   WebSocket Service: <ws://localhost:8000>
 -   phpMyAdmin: <http://localhost:8080> [username - app_user , password - app_pass]
 -   RabbitMQ Management: <http://localhost:15672> [username - guest , password - guest]
+
+## WebSocket Integration Guide
+
+### 1. Initial Connection
+
+First, fetch the WebSocket URL from the API:
+
+```javascript
+// Get WebSocket URL and initial stories
+const response = await fetch('http://localhost:3000/api/stories/recent');
+const data = await response.json();
+
+// Example response format:
+{
+  success: true,
+  data: {
+    stories: [...],
+    count: 10,
+    websocket: {
+      url: "ws://localhost:8000",
+      protocol: "ws"
+    }
+  }
+}
+```
+
+### 2\. Connect to WebSocket
+
+Use the WebSocket URL from the API response:
+
+```
+const ws = new WebSocket(data.data.websocket.url);
+
+ws.onopen = () => {
+  console.log('Connected to WebSocket');
+};
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  // Example message format:
+  // {
+  //   type: 'story',
+  //   data: {
+  //     id: number,
+  //     title: string,
+  //     url: string,
+  //     score: number,
+  //     author: string,
+  //     published_at: Date
+  //   },
+  //   timestamp: Date
+  // }
+
+  if (message.type === 'story') {
+    // Handle new story
+    console.log('New story:', message.data);
+  }
+};
+
+ws.onclose = () => {
+  console.log('Disconnected from WebSocket');
+  // Implement reconnection logic if needed
+};
+
+ws.onerror = (error) => {
+  console.error('WebSocket error:', error);
+};
+```
