@@ -2,8 +2,6 @@
 
 -- Create databases
 CREATE DATABASE IF NOT EXISTS scraper_db;
-CREATE DATABASE IF NOT EXISTS api_db;
-CREATE DATABASE IF NOT EXISTS analytics_db;
 
 -- Create tables in scraper_db
 USE scraper_db;
