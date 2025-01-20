@@ -2,6 +2,9 @@
 
 A microservices-based system that provides real-time updates for Hacker News stories.
 
+![Architecture](https://github.com/user-attachments/assets/312c8221-3035-4949-aebc-60d030eb3d30)
+
+
 ## Architecture Overview
 
 - **Scraper Service**: Fetches and processes stories from Hacker News API
