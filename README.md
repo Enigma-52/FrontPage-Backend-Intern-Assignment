@@ -12,6 +12,10 @@ A microservices-based system that provides real-time updates for Hacker News sto
 - **WebSocket Service**: Manages real-time updates to clients
 - **Web Client**: Static interface displaying stories and updates
 
+
+![AF563AB3-FEA1-41A6-9716-F14DFA139A56](https://github.com/user-attachments/assets/0d105d4d-7b74-4170-90da-661619e217c6)
+
+
 ## Quick Start
 
 1. Clone the repository
