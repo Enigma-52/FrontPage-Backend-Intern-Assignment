@@ -2,7 +2,10 @@
 
 A microservices-based system that provides real-time updates for Hacker News stories.
 
-![Architecture](https://github.com/user-attachments/assets/312c8221-3035-4949-aebc-60d030eb3d30)
+
+
+https://github.com/user-attachments/assets/32555f1a-4286-419a-a4f0-8aa0a01cab95
+
 
 
 ## Architecture Overview
@@ -11,6 +14,9 @@ A microservices-based system that provides real-time updates for Hacker News sto
 - **API Gateway**: Handles REST endpoints and initial data loading
 - **WebSocket Service**: Manages real-time updates to clients
 - **Web Client**: Static interface displaying stories and updates
+
+
+![Architecture](https://github.com/user-attachments/assets/312c8221-3035-4949-aebc-60d030eb3d30)
 
 
 ![AF563AB3-FEA1-41A6-9716-F14DFA139A56](https://github.com/user-attachments/assets/0d105d4d-7b74-4170-90da-661619e217c6)
