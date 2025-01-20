@@ -25,5 +25,5 @@ A microservices-based system that provides real-time updates for Hacker News sto
 -   Web Interface: <http://localhost:8081>
 -   API Gateway: <http://localhost:3000>
 -   WebSocket Service: <ws://localhost:8000>
--   phpMyAdmin: <http://localhost:8080>
--   RabbitMQ Management: <http://localhost:15672>
+-   phpMyAdmin: <http://localhost:8080> [username - app_user , password - app_pass]
+-   RabbitMQ Management: <http://localhost:15672> [username - guest , password - guest]
