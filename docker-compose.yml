@@ -21,12 +21,14 @@ services:
     networks:
       - app_network
 
-  adminer:
-    image: adminer:latest
-    ports:
-      - "8080:8080"
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
     environment:
-      ADMINER_DEFAULT_SERVER: mysql
+      PMA_HOST: mysql
+      PMA_USER: app_user
+      PMA_PASSWORD: app_pass
+    ports:
+      - "8080:80"
     depends_on:
       mysql:
         condition: service_healthy
@@ -66,6 +68,54 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    networks:
+      - app_network
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=app_user
+      - MYSQL_PASSWORD=app_pass
+      - MYSQL_DATABASE=scraper_db
+      - WEBSOCKET_URL=ws://websocket:8000
+      - WEBSOCKET_PROTOCOL=ws
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  websocket:
+    build:
+      context: ./services/websocket-service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - PORT=8000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app_network
+  
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "8081:80" 
+    depends_on:
+      - api-gateway
+      - websocket
     networks:
       - app_network
 

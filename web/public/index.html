@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HN Stories Live Feed</title>
+    <style>
+        :root {
+            --primary-color: #ff6600;
+            --text-color: #2e2e2c;
+            --bg-color: #f6f6ef;
+            --card-bg: white;
+            --shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 2px solid var(--primary-color);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin: 0;
+            font-size: 2rem;
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 15px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .stat-box {
+            padding: 10px 20px;
+            border-radius: 6px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .status {
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .connected::before {
+            background-color: #28a745;
+        }
+
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .disconnected::before {
+            background-color: #dc3545;
+        }
+
+        .story {
+            background-color: var(--card-bg);
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .story:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .story h3 {
+            margin: 0 0 12px 0;
+            font-size: 1.2rem;
+            line-height: 1.4;
+        }
+
+        .story-meta {
+            color: #666;
+            font-size: 0.9rem;
+            display: flex;
+            gap: 15px;
+        }
+
+        .story a {
+            color: var(--text-color);
+            text-decoration: none;
+        }
+
+        .story a:hover {
+            color: var(--primary-color);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 30px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .section-title {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            margin: 0;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-10px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        #connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="connection-status" class="status disconnected">Disconnected</div>
+    
+    <header>
+        <h1>Hacker News Live Feed</h1>
+    </header>
+
+    <div class="stats-container">
+        <div class="stat-box">
+            <div class="stat-number" id="recent-count">0</div>
+            <div class="stat-label">Stories in last 5 minutes</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" id="live-count">0</div>
+            <div class="stat-label">Live updates received</div>
+        </div>
+    </div>
+
+    <div class="section-header">
+        <h2 class="section-title">Live Updates</h2>
+    </div>
+    <div id="live-stories-container"></div>
+
+    <div class="section-header">
+        <h2 class="section-title">Recent Stories</h2>
+    </div>
+    <div id="initial-stories-container"></div>
+
+    <script>
+        const liveStoriesContainer = document.getElementById('live-stories-container');
+        const initialStoriesContainer = document.getElementById('initial-stories-container');
+        const connectionStatus = document.getElementById('connection-status');
+        const recentCountElement = document.getElementById('recent-count');
+        const liveCountElement = document.getElementById('live-count');
+        let liveStoriesCount = 0;
+        let ws;
+
+        async function fetchInitialData() {
+            try {
+                const response = await fetch('http://localhost:3000/api/stories/recent');
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update recent stories count
+                    recentCountElement.textContent = data.data.stories.length;
+                    
+                    // Display initial stories
+                    data.data.stories.forEach(story => {
+                        addStory(story, initialStoriesContainer);
+                    });
+                    
+                    const wsUrl = convertWebSocketUrl(data.data.websocket.url);
+                    connectWebSocket(wsUrl);
+                }
+            } catch (error) {
+                console.error('Failed to fetch initial data:', error);
+            }
+        }
+
+        function convertWebSocketUrl(url) {
+            try {
+                const wsUrl = new URL(url);
+                wsUrl.hostname = 'localhost';
+                return wsUrl.toString();
+            } catch (error) {
+                console.error('Failed to parse WebSocket URL:', error);
+                return 'ws://localhost:8000';
+            }
+        }
+
+        function connectWebSocket(wsUrl) {
+            console.log('Connecting to WebSocket:', wsUrl);
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('Connected to WebSocket');
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.className = 'status connected';
+            };
+
+            ws.onclose = () => {
+                console.log('Disconnected from WebSocket');
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.className = 'status disconnected';
+                setTimeout(() => connectWebSocket(wsUrl), 5000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                connectionStatus.textContent = 'Connection Error';
+                connectionStatus.className = 'status disconnected';
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'story') {
+                        addStory(message.data, liveStoriesContainer);
+                    }
+                } catch (error) {
+                    console.error('Error processing message:', error);
+                }
+            };
+        }
+
+        function addStory(story, container) {
+            const storyElement = document.createElement('div');
+            storyElement.className = 'story';
+            
+            const timestamp = new Date(story.published_at).toLocaleString();
+            
+            storyElement.innerHTML = `
+                <h3>
+                    <a href="${story.url || `https://news.ycombinator.com/item?id=${story.id}`}" target="_blank">
+                        ${story.title}
+                    </a>
+                </h3>
+                <div class="story-meta">
+                    <span>📈 ${story.score} points</span>
+                    <span>👤 ${story.author}</span>
+                    <span>🕒 ${timestamp}</span>
+                </div>
+            `;
+
+            container.insertBefore(storyElement, container.firstChild);
+
+            if (container === liveStoriesContainer) {
+                liveStoriesCount++;
+                liveCountElement.textContent = liveStoriesCount;
+                
+                if (container.children.length > 30) {
+                    container.removeChild(container.lastChild);
+                }
+            }
+        }
+
+        fetchInitialData();
+    </script>
+</body>
+</html>

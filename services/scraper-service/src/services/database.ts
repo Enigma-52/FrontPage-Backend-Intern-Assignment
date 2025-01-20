@@ -1,12 +1,13 @@
-// src/services/database.ts
 import mysql from 'mysql2/promise';
 import { Story } from '../models/story';
 import { Logger } from '../utils/logger';
+import { RabbitMQService } from './queue';
 
 export class DatabaseService {
     private pool: mysql.Pool;
+    private rabbitmqService: RabbitMQService;
 
-    constructor() {
+    constructor(rabbitmqService: RabbitMQService) {
         this.pool = mysql.createPool({
             host: process.env.MYSQL_HOST,
             user: process.env.MYSQL_USER,
@@ -16,10 +17,19 @@ export class DatabaseService {
             connectionLimit: 10,
             queueLimit: 0
         });
+        this.rabbitmqService = rabbitmqService;
         Logger.info('Database service initialized', { 
             host: process.env.MYSQL_HOST,
             database: process.env.MYSQL_DATABASE 
         });
+    }
+
+    private async checkStoryExists(id: number): Promise<boolean> {
+        const [rows] = await this.pool.execute(
+            'SELECT 1 FROM stories WHERE id = ?',
+            [id]
+        );
+        return (rows as any[]).length > 0;
     }
 
     async saveStory(story: Story): Promise<void> {
@@ -34,6 +44,10 @@ export class DatabaseService {
 
         try {
             Logger.debug(`Attempting to save story ${story.id}`);
+            
+            // Check if story exists before saving
+            const exists = await this.checkStoryExists(story.id);
+            
             await this.pool.execute(query, [
                 story.id,
                 story.title,
@@ -43,6 +57,13 @@ export class DatabaseService {
                 story.published_at,
                 story.type
             ]);
+            
+            // If story didn't exist before, publish to RabbitMQ
+            if (!exists) {
+                Logger.info(`New story detected: ${story.id}, publishing to RabbitMQ`);
+                await this.rabbitmqService.publishStory(story);
+            }
+
             Logger.debug(`Successfully saved story ${story.id}`);
         } catch (error) {
             Logger.error(`Failed to save story ${story.id}:`, error as Error);

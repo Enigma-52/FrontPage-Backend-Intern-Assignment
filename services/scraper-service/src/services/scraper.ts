@@ -1,28 +1,36 @@
-// src/services/scraper.ts
 import axios from 'axios';
 import { Story } from '../models/story';
 import { Logger } from '../utils/logger';
 import { ScraperError } from '../utils/errors';
 import { config } from '../config';
 import { DatabaseService } from './database';
+import { RabbitMQService } from './queue';
 
 export class ScraperService {
     private seenStories: Set<number>;
     private readonly apiBase: string;
     private database: DatabaseService;
+    private rabbitmqService: RabbitMQService;
 
     constructor() {
         this.seenStories = new Set();
         this.apiBase = config.hn.apiBase;
-        this.database = new DatabaseService();
+        this.rabbitmqService = new RabbitMQService();
+        this.database = new DatabaseService(this.rabbitmqService);
         Logger.info('Scraper service initialized');
+    }
+
+    async initialize(): Promise<void> {
+        await this.rabbitmqService.initialize();
+        Logger.info('RabbitMQ connection initialized');
     }
 
     async fetchStoryIds(): Promise<number[]> {
         try {
             const response = await axios.get<number[]>(`${this.apiBase}/newstories.json`);
-            Logger.info(`Fetched ${response.data.length} story IDs`);
-            return response.data;
+            const limitedStories = response.data.slice(0, 10);
+            Logger.info(`Fetched ${limitedStories.length} story IDs`);
+            return limitedStories;
         } catch (error) {
             Logger.error('Failed to fetch story IDs:', error as Error);
             throw new ScraperError('Failed to fetch story IDs');
@@ -67,7 +75,6 @@ export class ScraperService {
                         newStoriesCount++;
                         Logger.info(`Saved story: ${story.title}`);
                     }
-                    // Add small delay to avoid rate limiting
                     await new Promise(resolve => setTimeout(resolve, 100));
                 }
             }
@@ -79,13 +86,13 @@ export class ScraperService {
         }
     }
 
-    startPeriodicScraping(): void {
-        // Run initial scrape
+    async startPeriodicScraping(): Promise<void> {
+        await this.initialize();
+
         this.scrapeAndSave().catch(error => {
             Logger.error('Error in initial scrape:', error);
         });
 
-        // Set up periodic scraping
         setInterval(() => {
             this.scrapeAndSave().catch(error => {
                 Logger.error('Error in periodic scrape:', error);
@@ -93,5 +100,10 @@ export class ScraperService {
         }, config.app.scrapeInterval);
 
         Logger.info(`Periodic scraping started with interval ${config.app.scrapeInterval}ms`);
+    }
+
+    async shutdown(): Promise<void> {
+        await this.rabbitmqService.close();
+        await this.database.close();
     }
 }

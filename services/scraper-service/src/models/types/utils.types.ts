@@ -1,5 +1,3 @@
-// src/models/types/utils.types.ts
-
 // Pagination types
 export interface PaginationParams {
     page: number;

@@ -1,4 +1,3 @@
-// src/models/types/error.types.ts
 
 // Base error interface
 export interface BaseErrorType extends Error {
